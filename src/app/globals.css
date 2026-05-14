@@ -1,0 +1,94 @@
+@import url('https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@300;400;500;600;700&family=Crimson+Pro:ital,wght@0,300;0,400;0,600;1,300;1,400&display=swap');
+
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  :root {
+    color-scheme: dark;
+  }
+
+  * {
+    box-sizing: border-box;
+  }
+
+  html {
+    background-color: #0A1929;
+  }
+
+  body {
+    @apply bg-navy-900 text-slate-100 font-mono antialiased;
+    min-height: 100vh;
+  }
+
+  ::-webkit-scrollbar {
+    width: 4px;
+    height: 4px;
+  }
+
+  ::-webkit-scrollbar-track {
+    @apply bg-navy-900;
+  }
+
+  ::-webkit-scrollbar-thumb {
+    @apply bg-charcoal-600 rounded-full;
+  }
+
+  ::-webkit-scrollbar-thumb:hover {
+    @apply bg-electric-600;
+  }
+}
+
+@layer components {
+  .tac-panel {
+    @apply bg-charcoal-800 border border-charcoal-600 rounded-sm;
+  }
+
+  .tac-header {
+    @apply text-[10px] font-mono font-semibold uppercase tracking-[0.15em] text-electric-400;
+  }
+
+  .tac-label {
+    @apply text-[10px] font-mono uppercase tracking-widest text-slate-500;
+  }
+
+  .tac-value {
+    @apply font-mono text-sm text-slate-200;
+  }
+
+  .tac-divider {
+    @apply border-t border-charcoal-600 border-dashed;
+  }
+
+  .btn-tactical {
+    @apply inline-flex items-center gap-2 px-3 py-1.5 text-xs font-mono uppercase tracking-wider
+    bg-charcoal-700 border border-charcoal-600 text-slate-300
+    hover:border-electric-500 hover:text-electric-400
+    transition-all duration-150 rounded-sm cursor-pointer;
+  }
+
+  .btn-tactical-primary {
+    @apply btn-tactical bg-electric-600 border-electric-500 text-white
+    hover:bg-electric-500 hover:border-electric-400 hover:text-white
+    shadow-electric;
+  }
+
+  .status-dot {
+    @apply inline-block w-1.5 h-1.5 rounded-full;
+  }
+
+  .glow-text {
+    text-shadow: 0 0 10px rgba(59, 130, 246, 0.5);
+  }
+}
+
+@layer utilities {
+  .text-electric-glow {
+    text-shadow: 0 0 10px rgba(59, 130, 246, 0.6), 0 0 20px rgba(59, 130, 246, 0.3);
+  }
+
+  .border-electric-glow {
+    box-shadow: 0 0 0 1px rgba(59, 130, 246, 0.4), 0 0 15px rgba(59, 130, 246, 0.15);
+  }
+}
