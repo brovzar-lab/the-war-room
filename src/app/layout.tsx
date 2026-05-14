@@ -3,7 +3,7 @@ import './globals.css';
 import { Toaster } from 'react-hot-toast';
 
 export const metadata: Metadata = {
-  title: 'TheWarRoom',
+  title: 'TheWarRoom — Intelligence Brief',
   description: 'CEO Intelligence Command Center',
 };
 
@@ -16,11 +16,11 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
           position="bottom-right"
           toastOptions={{
             style: {
-              background: '#1E293B',
-              color: '#CBD5E1',
-              border: '1px solid #334155',
+              background: '#1a1a1a',
+              color: '#f0f0f0',
+              border: '1px solid #2e2e2e',
               fontFamily: 'JetBrains Mono, monospace',
-              fontSize: '12px',
+              fontSize: '11px',
             },
           }}
         />

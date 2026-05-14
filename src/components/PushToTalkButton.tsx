@@ -1,6 +1,6 @@
 'use client';
 
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useRef } from 'react';
 import { clsx } from 'clsx';
 import { Mic, MicOff, Loader2 } from 'lucide-react';
 import { useVoiceStore } from '@/store/voice-store';
@@ -28,73 +28,84 @@ export function PushToTalkButton() {
     if (state === 'processing') {
       holdTimerRef.current = setTimeout(() => setIdle(), 2000);
     }
-    return () => { if (holdTimerRef.current) clearTimeout(holdTimerRef.current); };
+    return () => {
+      if (holdTimerRef.current) clearTimeout(holdTimerRef.current);
+    };
   }, [state, setIdle]);
 
   return (
-    <div className="flex flex-col items-center gap-6">
+    <div className="flex flex-col gap-4">
       {/* waveform display */}
-      <div className="w-full h-16 flex items-center justify-center">
+      <div className="w-full h-10 flex items-center justify-center">
         <WaveformVisualizer data={waveformData} isActive={isRecording} className="w-full" />
       </div>
 
-      {/* PTT button */}
+      {/* full-width amber voice briefing button */}
       <div className="relative">
-        {/* outer ring */}
-        <div className={clsx(
-          'absolute inset-0 rounded-full transition-all duration-300',
-          isRecording && 'animate-ping-slow bg-electric-500/20',
-        )} style={{ inset: '-16px' }} />
-
-        {/* second ring */}
+        {/* amber glow ring when recording */}
         {isRecording && (
-          <div className="absolute rounded-full border border-electric-500/30 animate-pulse"
-            style={{ inset: '-8px' }} />
+          <div
+            className="absolute inset-0 rounded-sm animate-pulse-slow"
+            style={{ boxShadow: '0 0 20px rgba(245, 158, 11, 0.4), 0 0 40px rgba(245, 158, 11, 0.2)' }}
+          />
         )}
 
-        {/* main button */}
         <button
           onMouseDown={handlePress}
           onTouchStart={(e) => { e.preventDefault(); handlePress(); }}
           disabled={isProcessing}
           className={clsx(
-            'relative w-24 h-24 rounded-full flex items-center justify-center',
-            'transition-all duration-150 select-none',
-            'focus:outline-none focus:ring-2 focus:ring-electric-500 focus:ring-offset-2 focus:ring-offset-navy-900',
+            'relative w-full flex items-center justify-center gap-3 py-3.5',
+            'font-mono text-[12px] uppercase tracking-[0.2em]',
+            'transition-all duration-150 select-none focus:outline-none',
+            'border',
             isRecording
-              ? 'bg-electric-600 border-2 border-electric-400 shadow-electric-lg scale-105'
+              ? 'bg-brief-accent border-brief-accent text-black'
               : isProcessing
-              ? 'bg-charcoal-700 border-2 border-charcoal-600 cursor-not-allowed'
-              : 'bg-charcoal-800 border-2 border-charcoal-600 hover:border-electric-500 hover:shadow-electric active:scale-95',
+              ? 'bg-brief-surface2 border-brief-border text-brief-muted cursor-not-allowed'
+              : 'bg-brief-surface border-brief-accent/40 text-brief-accent hover:bg-brief-accent/10 hover:border-brief-accent active:scale-[0.99]',
           )}
         >
           {isProcessing ? (
-            <Loader2 className="w-8 h-8 text-electric-400 animate-spin" />
+            <>
+              <Loader2 className="w-4 h-4 animate-spin" />
+              Processing...
+            </>
           ) : isRecording ? (
-            <MicOff className="w-8 h-8 text-white" />
+            <>
+              <MicOff className="w-4 h-4" />
+              Release to Stop
+            </>
           ) : (
-            <Mic className="w-8 h-8 text-slate-400" />
+            <>
+              <Mic className="w-4 h-4" />
+              Hold to Voice Briefing
+            </>
           )}
         </button>
       </div>
 
-      {/* status label */}
-      <div className="flex items-center gap-2 h-5">
+      {/* status line */}
+      <div className="flex items-center justify-center h-4">
         {isRecording && (
-          <>
-            <span className="w-1.5 h-1.5 rounded-full bg-red-500 animate-pulse" />
-            <span className="text-[11px] font-mono uppercase tracking-widest text-red-400">Recording</span>
-          </>
+          <div className="flex items-center gap-2">
+            <span className="w-1.5 h-1.5 rounded-full bg-brief-urgent animate-pulse" />
+            <span className="font-mono text-[10px] uppercase tracking-widest text-brief-urgent">
+              Recording
+            </span>
+          </div>
         )}
         {isProcessing && (
-          <>
-            <span className="w-1.5 h-1.5 rounded-full bg-electric-400 animate-pulse" />
-            <span className="text-[11px] font-mono uppercase tracking-widest text-electric-400">Processing...</span>
-          </>
+          <div className="flex items-center gap-2">
+            <span className="w-1.5 h-1.5 rounded-full bg-brief-accent animate-pulse" />
+            <span className="font-mono text-[10px] uppercase tracking-widest text-brief-accent">
+              Processing...
+            </span>
+          </div>
         )}
         {state === 'idle' && (
-          <span className="text-[11px] font-mono uppercase tracking-widest text-slate-600">
-            Press to talk
+          <span className="font-mono text-[10px] uppercase tracking-widest text-brief-muted">
+            Ready
           </span>
         )}
       </div>
