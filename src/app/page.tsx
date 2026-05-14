@@ -1,6 +1,6 @@
 import Link from 'next/link';
-import { DemoModeBadge } from '@/components/DemoModeBadge';
-import { MOCK_COMPARTMENTS, PIPELINE_DATA } from '@/lib/mock-data';
+import { api } from '@/lib/api';
+import type { Compartment } from '@/lib/mock-data';
 
 function temperatureColor(temp: string) {
   switch (temp) {
@@ -12,34 +12,82 @@ function temperatureColor(temp: string) {
   }
 }
 
-function temperatureBg(temp: string) {
-  switch (temp) {
-    case 'hot': return 'bg-brief-hot/10 border-brief-hot/30';
-    case 'warm': return 'bg-brief-warm/10 border-brief-warm/30';
-    case 'cold': return 'bg-brief-cold/10 border-brief-cold/30';
-    case 'new': return 'bg-brief-new/10 border-brief-new/30';
-    default: return 'bg-brief-surface border-brief-border';
+
+function computePipeline(compartments: Compartment[]) {
+  const totalValue = compartments.reduce((sum, c) => sum + (c.metrics.dealValue ?? 0), 0);
+  return {
+    total: totalValue > 0 ? `$${totalValue}M` : '—',
+    deals: compartments.length,
+    closing: compartments.filter((c) => c.status === 'closing').length,
+    atRisk: compartments.filter((c) => c.needsAction).length,
+  };
+}
+
+async function fetchCompartments(): Promise<Compartment[]> {
+  try {
+    return await api.getCompartments({ cache: 'no-store' });
+  } catch {
+    return [];
   }
 }
 
-export default function DashboardPage() {
-  const featured = MOCK_COMPARTMENTS.find((c) => c.isPinned && c.needsAction) ?? MOCK_COMPARTMENTS[0];
-  const actionDeals = MOCK_COMPARTMENTS.filter((c) => c.needsAction);
-  const fieldReports = MOCK_COMPARTMENTS.filter((c) => c.id !== featured.id);
+function EmptyDashboard({ dateStr }: { dateStr: string }) {
+  return (
+    <div className="min-h-screen bg-brief-bg text-brief-text flex flex-col">
+      <header className="border-b border-brief-border px-6 py-3">
+        <div className="max-w-[1400px] mx-auto flex items-baseline justify-between">
+          <div>
+            <span className="font-mono text-[11px] uppercase tracking-[0.25em] text-brief-muted">
+              The War Room
+            </span>
+            <span className="font-mono text-[11px] uppercase tracking-[0.25em] text-brief-accent ml-3">
+              Intelligence Brief
+            </span>
+          </div>
+          <div className="font-mono text-[10px] text-brief-muted uppercase tracking-widest">
+            {dateStr}
+          </div>
+        </div>
+      </header>
+      <main className="flex-1 flex items-center justify-center">
+        <div className="text-center max-w-sm">
+          <h2 className="font-serif text-4xl text-brief-text mb-3">No compartments yet</h2>
+          <p className="font-sans text-sm text-brief-muted mb-8 leading-relaxed">
+            Create your first deal compartment to begin intelligence tracking.
+          </p>
+          <button className="brief-btn">Create Compartment</button>
+        </div>
+      </main>
+    </div>
+  );
+}
 
-  // Bar chart data: by value descending
-  const byValue = [...MOCK_COMPARTMENTS]
+export default async function DashboardPage() {
+  const compartments = await fetchCompartments();
+
+  const dateStr = new Date().toLocaleDateString('en-US', {
+    weekday: 'long',
+    year: 'numeric',
+    month: 'long',
+    day: 'numeric',
+  });
+
+  if (compartments.length === 0) {
+    return <EmptyDashboard dateStr={dateStr} />;
+  }
+
+  const featured = compartments.find((c) => c.isPinned && c.needsAction) ?? compartments[0];
+  const actionDeals = compartments.filter((c) => c.needsAction);
+  const fieldReports = compartments.filter((c) => c.id !== featured.id);
+  const pipelineData = computePipeline(compartments);
+
+  const byValue = [...compartments]
     .filter((c) => c.metrics.dealValue)
     .sort((a, b) => (b.metrics.dealValue ?? 0) - (a.metrics.dealValue ?? 0));
-  const maxVal = Math.max(...byValue.map((c) => c.metrics.dealValue ?? 0));
-
-  const today = new Date('2026-05-14');
-  const dateStr = today.toLocaleDateString('en-US', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' });
+  const maxVal = Math.max(...byValue.map((c) => c.metrics.dealValue ?? 0), 1);
 
   return (
     <div className="min-h-screen bg-brief-bg text-brief-text">
-      <DemoModeBadge />
-
       {/* MASTHEAD */}
       <header className="border-b border-brief-border px-6 py-3">
         <div className="max-w-[1400px] mx-auto flex items-baseline justify-between">
@@ -52,7 +100,7 @@ export default function DashboardPage() {
             </span>
           </div>
           <div className="font-mono text-[10px] text-brief-muted uppercase tracking-widest">
-            {dateStr} &nbsp;|&nbsp; Vol. IV No. 14
+            {dateStr}
           </div>
         </div>
       </header>
@@ -126,17 +174,19 @@ export default function DashboardPage() {
             </div>
 
             {/* Key insights */}
-            <div className="mb-6 border-t border-brief-border pt-4">
-              <span className="brief-section-label block mb-3">Field Intelligence</span>
-              <div className="grid grid-cols-2 gap-2">
-                {featured.insights.map((insight, i) => (
-                  <div key={i} className="flex items-start gap-2 text-[12px] font-sans text-brief-muted">
-                    <span className="text-brief-accent mt-0.5 shrink-0">›</span>
-                    <span>{insight}</span>
-                  </div>
-                ))}
+            {featured.insights.length > 0 && (
+              <div className="mb-6 border-t border-brief-border pt-4">
+                <span className="brief-section-label block mb-3">Field Intelligence</span>
+                <div className="grid grid-cols-2 gap-2">
+                  {featured.insights.map((insight, i) => (
+                    <div key={i} className="flex items-start gap-2 text-[12px] font-sans text-brief-muted">
+                      <span className="text-brief-accent mt-0.5 shrink-0">›</span>
+                      <span>{insight}</span>
+                    </div>
+                  ))}
+                </div>
               </div>
-            </div>
+            )}
 
             {/* Action buttons */}
             <div className="flex items-center gap-3">
@@ -175,115 +225,121 @@ export default function DashboardPage() {
               <div className="grid grid-cols-2 gap-3">
                 <div className="bg-brief-surface border border-brief-border p-3">
                   <div className="font-mono text-[9px] uppercase tracking-widest text-brief-muted mb-1">Total</div>
-                  <div className="font-serif text-2xl text-brief-text">{PIPELINE_DATA.total}</div>
+                  <div className="font-serif text-2xl text-brief-text">{pipelineData.total}</div>
                 </div>
                 <div className="bg-brief-surface border border-brief-border p-3">
                   <div className="font-mono text-[9px] uppercase tracking-widest text-brief-muted mb-1">Deals</div>
-                  <div className="font-serif text-2xl text-brief-text">{PIPELINE_DATA.deals}</div>
+                  <div className="font-serif text-2xl text-brief-text">{pipelineData.deals}</div>
                 </div>
                 <div className="bg-brief-surface border border-brief-border p-3">
                   <div className="font-mono text-[9px] uppercase tracking-widest text-brief-muted mb-1">Closing</div>
-                  <div className="font-serif text-2xl text-brief-new">{PIPELINE_DATA.closing}</div>
+                  <div className="font-serif text-2xl text-brief-new">{pipelineData.closing}</div>
                 </div>
                 <div className="bg-brief-surface border border-brief-border p-3">
                   <div className="font-mono text-[9px] uppercase tracking-widest text-brief-muted mb-1">At Risk</div>
-                  <div className="font-serif text-2xl text-brief-urgent">{PIPELINE_DATA.atRisk}</div>
+                  <div className="font-serif text-2xl text-brief-urgent">{pipelineData.atRisk}</div>
                 </div>
               </div>
             </div>
 
             {/* By Value Bar Chart */}
-            <div>
-              <div className="flex items-center justify-between mb-3">
-                <span className="brief-section-label">By Value</span>
-                <span className="font-mono text-[9px] text-brief-muted">USD MILLIONS</span>
+            {byValue.length > 0 && (
+              <div>
+                <div className="flex items-center justify-between mb-3">
+                  <span className="brief-section-label">By Value</span>
+                  <span className="font-mono text-[9px] text-brief-muted">USD MILLIONS</span>
+                </div>
+                <div className="space-y-2.5">
+                  {byValue.map((deal) => {
+                    const pct = Math.round(((deal.metrics.dealValue ?? 0) / maxVal) * 100);
+                    const barColor =
+                      deal.temperature === 'hot' ? 'bg-brief-urgent' :
+                      deal.temperature === 'cold' ? 'bg-brief-cold' :
+                      deal.temperature === 'new' ? 'bg-brief-new' :
+                      'bg-brief-accent';
+                    return (
+                      <Link key={deal.id} href={`/compartment/${deal.id}`} className="block group">
+                        <div className="flex items-center justify-between mb-1">
+                          <span className={`font-mono text-[10px] uppercase tracking-wider group-hover:text-brief-accent transition-colors ${temperatureColor(deal.temperature)}`}>
+                            {deal.companyName}
+                          </span>
+                          <span className="font-mono text-[10px] text-brief-muted">
+                            ${deal.metrics.dealValue}M
+                          </span>
+                        </div>
+                        <div className="h-1.5 bg-brief-surface2 w-full">
+                          <div
+                            className={`h-full ${barColor} transition-all`}
+                            style={{ width: `${pct}%` }}
+                          />
+                        </div>
+                      </Link>
+                    );
+                  })}
+                </div>
               </div>
-              <div className="space-y-2.5">
-                {byValue.map((deal) => {
-                  const pct = Math.round(((deal.metrics.dealValue ?? 0) / maxVal) * 100);
-                  const barColor =
-                    deal.temperature === 'hot' ? 'bg-brief-urgent' :
-                    deal.temperature === 'cold' ? 'bg-brief-cold' :
-                    deal.temperature === 'new' ? 'bg-brief-new' :
-                    'bg-brief-accent';
-                  return (
-                    <Link key={deal.id} href={`/compartment/${deal.id}`} className="block group">
-                      <div className="flex items-center justify-between mb-1">
-                        <span className={`font-mono text-[10px] uppercase tracking-wider group-hover:text-brief-accent transition-colors ${temperatureColor(deal.temperature)}`}>
-                          {deal.companyName}
-                        </span>
-                        <span className="font-mono text-[10px] text-brief-muted">
-                          ${deal.metrics.dealValue}M
-                        </span>
-                      </div>
-                      <div className="h-1.5 bg-brief-surface2 w-full">
-                        <div
-                          className={`h-full ${barColor} transition-all`}
-                          style={{ width: `${pct}%` }}
-                        />
-                      </div>
-                    </Link>
-                  );
-                })}
-              </div>
-            </div>
+            )}
 
             {/* Key contacts / quick jump */}
-            <div>
-              <span className="brief-section-label block mb-3">Hot Contacts</span>
-              <div className="space-y-2">
-                {featured.keyContacts.map((contact) => (
-                  <div key={contact} className="flex items-center gap-2 font-mono text-[11px] text-brief-muted border-b border-brief-border/50 pb-2 last:border-0">
-                    <span className="w-4 h-4 bg-brief-surface2 border border-brief-border flex items-center justify-center text-[8px] text-brief-text shrink-0">
-                      {contact[0]}
-                    </span>
-                    {contact}
-                  </div>
-                ))}
+            {featured.keyContacts.length > 0 && (
+              <div>
+                <span className="brief-section-label block mb-3">Hot Contacts</span>
+                <div className="space-y-2">
+                  {featured.keyContacts.map((contact) => (
+                    <div key={contact} className="flex items-center gap-2 font-mono text-[11px] text-brief-muted border-b border-brief-border/50 pb-2 last:border-0">
+                      <span className="w-4 h-4 bg-brief-surface2 border border-brief-border flex items-center justify-center text-[8px] text-brief-text shrink-0">
+                        {contact[0]}
+                      </span>
+                      {contact}
+                    </div>
+                  ))}
+                </div>
               </div>
-            </div>
+            )}
           </div>
         </div>
       </main>
 
       {/* FIELD REPORTS STRIP */}
-      <section className="border-t border-brief-border bg-brief-surface">
-        <div className="max-w-[1400px] mx-auto px-6 py-3">
-          <div className="flex items-center gap-1 mb-3">
-            <span className="brief-section-label">Field Reports</span>
-          </div>
-          <div className="flex gap-0 overflow-x-auto">
-            {fieldReports.map((deal, i) => (
-              <Link
-                key={deal.id}
-                href={`/compartment/${deal.id}`}
-                className="shrink-0 border-r border-brief-border last:border-r-0 pr-5 mr-5 last:mr-0 group"
-              >
-                <div className="flex items-center gap-2 mb-1">
-                  <span className={`font-mono text-[10px] font-semibold uppercase tracking-wider group-hover:underline ${temperatureColor(deal.temperature)}`}>
-                    {deal.companyName}
-                  </span>
-                  {deal.metrics.dealSize && (
-                    <span className="font-mono text-[10px] text-brief-muted">
-                      {deal.metrics.dealSize}
+      {fieldReports.length > 0 && (
+        <section className="border-t border-brief-border bg-brief-surface">
+          <div className="max-w-[1400px] mx-auto px-6 py-3">
+            <div className="flex items-center gap-1 mb-3">
+              <span className="brief-section-label">Field Reports</span>
+            </div>
+            <div className="flex gap-0 overflow-x-auto">
+              {fieldReports.map((deal) => (
+                <Link
+                  key={deal.id}
+                  href={`/compartment/${deal.id}`}
+                  className="shrink-0 border-r border-brief-border last:border-r-0 pr-5 mr-5 last:mr-0 group"
+                >
+                  <div className="flex items-center gap-2 mb-1">
+                    <span className={`font-mono text-[10px] font-semibold uppercase tracking-wider group-hover:underline ${temperatureColor(deal.temperature)}`}>
+                      {deal.companyName}
                     </span>
-                  )}
-                  <span className="font-mono text-[8px] text-brief-muted">•</span>
-                  <span className={`font-mono text-[9px] uppercase ${temperatureColor(deal.temperature)}`}>
-                    {deal.temperature}
-                  </span>
-                  {deal.needsAction && (
-                    <span className="font-mono text-[8px] text-brief-urgent">[!]</span>
-                  )}
-                </div>
-                <p className="font-sans text-[11px] text-brief-muted max-w-[200px] truncate">
-                  {deal.fieldReportSummary}
-                </p>
-              </Link>
-            ))}
+                    {deal.metrics.dealSize && (
+                      <span className="font-mono text-[10px] text-brief-muted">
+                        {deal.metrics.dealSize}
+                      </span>
+                    )}
+                    <span className="font-mono text-[8px] text-brief-muted">•</span>
+                    <span className={`font-mono text-[9px] uppercase ${temperatureColor(deal.temperature)}`}>
+                      {deal.temperature}
+                    </span>
+                    {deal.needsAction && (
+                      <span className="font-mono text-[8px] text-brief-urgent">[!]</span>
+                    )}
+                  </div>
+                  <p className="font-sans text-[11px] text-brief-muted max-w-[200px] truncate">
+                    {deal.fieldReportSummary}
+                  </p>
+                </Link>
+              ))}
+            </div>
           </div>
-        </div>
-      </section>
+        </section>
+      )}
 
       {/* FOOTER NAV */}
       <footer className="border-t border-brief-border bg-brief-bg px-6 py-2">

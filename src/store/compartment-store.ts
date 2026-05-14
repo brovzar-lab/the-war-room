@@ -1,12 +1,16 @@
 import { create } from 'zustand';
-import { Compartment, Message, MOCK_COMPARTMENTS, MOCK_MESSAGES } from '@/lib/mock-data';
-import { isDemoMode } from '@/lib/demo';
+import type { Compartment, Message } from '@/lib/mock-data';
+import { api } from '@/lib/api';
 
 interface CompartmentStore {
   compartments: Compartment[];
   activeCompartmentId: string | null;
   messages: Record<string, Message[]>;
   activeContextPages: string[];
+  isLoading: boolean;
+  error: string | null;
+
+  fetchCompartments: () => Promise<void>;
   setActiveCompartment: (id: string) => void;
   addMessage: (compartmentId: string, message: Message) => void;
   toggleContextPage: (page: string) => void;
@@ -14,10 +18,23 @@ interface CompartmentStore {
 }
 
 export const useCompartmentStore = create<CompartmentStore>((set, get) => ({
-  compartments: isDemoMode ? MOCK_COMPARTMENTS : [],
+  compartments: [],
   activeCompartmentId: null,
-  messages: isDemoMode ? MOCK_MESSAGES : {},
+  messages: {},
   activeContextPages: [],
+  isLoading: false,
+  error: null,
+
+  fetchCompartments: async () => {
+    if (get().isLoading) return;
+    set({ isLoading: true, error: null });
+    try {
+      const compartments = await api.getCompartments();
+      set({ compartments, isLoading: false });
+    } catch (err) {
+      set({ error: String(err), isLoading: false });
+    }
+  },
 
   setActiveCompartment: (id) => {
     const compartment = get().compartments.find((c) => c.id === id);
