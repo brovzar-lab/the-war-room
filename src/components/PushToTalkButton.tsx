@@ -6,32 +6,105 @@ import { Mic, MicOff, Loader2 } from 'lucide-react';
 import { useVoiceStore } from '@/store/voice-store';
 import { WaveformVisualizer, useWaveformSimulator } from './WaveformVisualizer';
 
-export function PushToTalkButton() {
-  const { state, startRecording, stopRecording, setIdle, setWaveformData, waveformData } = useVoiceStore();
+// Minimal Web Speech API typings — not in all lib.dom.d.ts versions
+interface SpeechRecognitionResultItem {
+  readonly transcript: string;
+}
+interface SpeechRecognitionResult {
+  readonly [index: number]: SpeechRecognitionResultItem;
+}
+interface SpeechRecognitionResultList {
+  readonly [index: number]: SpeechRecognitionResult;
+}
+interface SpeechRecognitionEvent extends Event {
+  readonly results: SpeechRecognitionResultList;
+}
+interface SpeechRecognitionInstance extends EventTarget {
+  continuous: boolean;
+  interimResults: boolean;
+  lang: string;
+  start(): void;
+  stop(): void;
+  onresult: ((e: SpeechRecognitionEvent) => void) | null;
+  onerror: ((e: Event) => void) | null;
+  onend: (() => void) | null;
+}
+
+declare global {
+  interface Window {
+    SpeechRecognition?: new () => SpeechRecognitionInstance;
+    webkitSpeechRecognition?: new () => SpeechRecognitionInstance;
+  }
+}
+
+interface Props {
+  onTranscript: (text: string) => Promise<void>;
+}
+
+export function PushToTalkButton({ onTranscript }: Props) {
+  const { state, startRecording, stopRecording, setIdle, setWaveformData, waveformData } =
+    useVoiceStore();
   const isRecording = state === 'recording';
   const isProcessing = state === 'processing';
-  const holdTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const recognitionRef = useRef<SpeechRecognitionInstance | null>(null);
+  const transcriptHandledRef = useRef(false);
 
   useWaveformSimulator(isRecording, setWaveformData);
 
+  // Fallback: if processing gets stuck (e.g. network timeout), auto-reset after 15s
+  useEffect(() => {
+    if (state !== 'processing') return;
+    const timer = setTimeout(() => setIdle(), 15_000);
+    return () => clearTimeout(timer);
+  }, [state, setIdle]);
+
   const handlePress = useCallback(() => {
     if (isProcessing) return;
-    if (isRecording) {
-      stopRecording();
-    } else {
-      startRecording();
-    }
-  }, [isRecording, isProcessing, startRecording, stopRecording]);
 
-  // Simulate processing after recording stops
-  useEffect(() => {
-    if (state === 'processing') {
-      holdTimerRef.current = setTimeout(() => setIdle(), 2000);
+    if (isRecording) {
+      // User released early — stop recognition; onend will fire and clean up
+      recognitionRef.current?.stop();
+      return;
     }
-    return () => {
-      if (holdTimerRef.current) clearTimeout(holdTimerRef.current);
+
+    const Ctor = window.SpeechRecognition ?? window.webkitSpeechRecognition;
+    if (!Ctor) {
+      // Browser doesn't support speech recognition — graceful no-op
+      return;
+    }
+
+    transcriptHandledRef.current = false;
+    const recognition = new Ctor();
+    recognition.continuous = false;
+    recognition.interimResults = false;
+    recognition.lang = 'en-US';
+
+    recognition.onresult = (e: SpeechRecognitionEvent) => {
+      const transcript = e.results[0]?.[0]?.transcript ?? '';
+      if (!transcript) return;
+      transcriptHandledRef.current = true;
+      stopRecording(); // → 'processing'
+
+      onTranscript(transcript).finally(() => {
+        setIdle();
+      });
     };
-  }, [state, setIdle]);
+
+    recognition.onerror = () => {
+      setIdle();
+    };
+
+    recognition.onend = () => {
+      // If no result was produced (silence), go back to idle
+      if (!transcriptHandledRef.current) {
+        setIdle();
+      }
+    };
+
+    recognitionRef.current = recognition;
+    recognition.start();
+    startRecording();
+  }, [isRecording, isProcessing, startRecording, stopRecording, setIdle, onTranscript]);
 
   return (
     <div className="flex flex-col gap-4">
@@ -42,7 +115,6 @@ export function PushToTalkButton() {
 
       {/* full-width amber voice briefing button */}
       <div className="relative">
-        {/* amber glow ring when recording */}
         {isRecording && (
           <div
             className="absolute inset-0 rounded-sm animate-pulse-slow"

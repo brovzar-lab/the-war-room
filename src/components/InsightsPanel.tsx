@@ -3,17 +3,9 @@
 import { useState } from 'react';
 import { clsx } from 'clsx';
 import { Lightbulb, CheckSquare, HelpCircle, Save, RefreshCw, ChevronRight } from 'lucide-react';
-import { useCompartmentStore } from '@/store/compartment-store';
-import { Compartment } from '@/lib/mock-data';
-import { isDemoMode, demoToast } from '@/lib/demo';
+import { api } from '@/lib/api';
+import type { Compartment } from '@/lib/mock-data';
 import toast from 'react-hot-toast';
-
-const MOCK_ACTION_ITEMS = [
-  { id: 'a1', text: 'Send revised IP clause language to Marcus', done: false, priority: 'high' },
-  { id: 'a2', text: 'Confirm data residency requirements with Sarah', done: false, priority: 'high' },
-  { id: 'a3', text: 'Review termination clause counter-proposal', done: true, priority: 'medium' },
-  { id: 'a4', text: 'Schedule follow-up call with legal team', done: false, priority: 'medium' },
-];
 
 function ActionItem({ text, done, priority }: { text: string; done: boolean; priority: string }) {
   const [checked, setChecked] = useState(done);
@@ -52,18 +44,44 @@ function ActionItem({ text, done, priority }: { text: string; done: boolean; pri
   );
 }
 
+// Derived from compartment insights until the backend surfaces discrete action items
+function deriveActionItems(compartment: Compartment) {
+  return compartment.insights.slice(0, 4).map((text, i) => ({
+    id: `insight-${i}`,
+    text,
+    done: false,
+    priority: i < 2 ? 'high' : 'medium',
+  }));
+}
+
 export function InsightsPanel({ compartment }: { compartment: Compartment }) {
-  const handleSaveSession = () => {
-    if (isDemoMode) {
-      toast(demoToast, { icon: '📋' });
+  const [isSaving, setIsSaving] = useState(false);
+
+  const handleSaveSession = async () => {
+    setIsSaving(true);
+    try {
+      await api.writeback(compartment.id);
+      toast.success('Session saved to vault');
+    } catch {
+      toast.error('Failed to save session');
+    } finally {
+      setIsSaving(false);
     }
   };
 
-  const handleSyncObsidian = () => {
-    if (isDemoMode) {
-      toast(demoToast, { icon: '🔄' });
+  const handleSyncObsidian = async () => {
+    setIsSaving(true);
+    try {
+      await api.writeback(compartment.id);
+      toast.success('Synced to Obsidian vault');
+    } catch {
+      toast.error('Sync failed');
+    } finally {
+      setIsSaving(false);
     }
   };
+
+  const actionItems = deriveActionItems(compartment);
 
   return (
     <div className="flex flex-col h-full bg-brief-bg">
@@ -74,61 +92,67 @@ export function InsightsPanel({ compartment }: { compartment: Compartment }) {
 
       <div className="flex-1 overflow-y-auto min-h-0 p-4 space-y-5">
         {/* key insights */}
-        <div>
-          <div className="flex items-center gap-2 mb-3">
-            <Lightbulb className="w-3.5 h-3.5 text-brief-accent" />
-            <span className="brief-section-label" style={{ color: '#f59e0b' }}>Key Insights</span>
+        {compartment.insights.length > 0 && (
+          <div>
+            <div className="flex items-center gap-2 mb-3">
+              <Lightbulb className="w-3.5 h-3.5 text-brief-accent" />
+              <span className="brief-section-label" style={{ color: '#f59e0b' }}>Key Insights</span>
+            </div>
+            <div className="space-y-2">
+              {compartment.insights.map((insight, i) => (
+                <div
+                  key={i}
+                  className="flex items-start gap-2.5 p-2.5 bg-brief-surface border border-brief-border/60"
+                >
+                  <ChevronRight className="w-3 h-3 text-brief-accent mt-0.5 shrink-0" />
+                  <p className="font-sans text-[11px] text-brief-text/80 leading-relaxed">{insight}</p>
+                </div>
+              ))}
+            </div>
           </div>
-          <div className="space-y-2">
-            {compartment.insights.map((insight, i) => (
-              <div
-                key={i}
-                className="flex items-start gap-2.5 p-2.5 bg-brief-surface border border-brief-border/60"
-              >
-                <ChevronRight className="w-3 h-3 text-brief-accent mt-0.5 shrink-0" />
-                <p className="font-sans text-[11px] text-brief-text/80 leading-relaxed">{insight}</p>
-              </div>
-            ))}
-          </div>
-        </div>
+        )}
 
         {/* open questions */}
-        <div>
-          <div className="flex items-center gap-2 mb-3">
-            <HelpCircle className="w-3.5 h-3.5 text-brief-muted" />
-            <span className="brief-section-label">Open Questions</span>
-            <span className="ml-auto font-mono text-[10px] text-brief-accent">{compartment.openQuestions}</span>
+        {compartment.openQuestions > 0 && (
+          <div>
+            <div className="flex items-center gap-2 mb-3">
+              <HelpCircle className="w-3.5 h-3.5 text-brief-muted" />
+              <span className="brief-section-label">Open Questions</span>
+              <span className="ml-auto font-mono text-[10px] text-brief-accent">{compartment.openQuestions}</span>
+            </div>
+            <div className="space-y-1.5">
+              {Array.from({ length: compartment.openQuestions }, (_, i) => (
+                <div
+                  key={i}
+                  className="flex items-center gap-2 font-mono text-[11px] text-brief-muted px-2 py-1"
+                >
+                  <span className="text-brief-muted/50">Q{i + 1}</span>
+                  <span className="text-brief-muted/60">
+                    {i === 0 && 'Who has final sign-off authority on pricing?'}
+                    {i === 1 && 'What is the revised timeline post-legal?'}
+                    {i === 2 && 'Are there competing bids we need to counter?'}
+                    {i > 2 && `Open question ${i + 1}`}
+                  </span>
+                </div>
+              ))}
+            </div>
           </div>
-          <div className="space-y-1.5">
-            {Array.from({ length: compartment.openQuestions }, (_, i) => (
-              <div
-                key={i}
-                className="flex items-center gap-2 font-mono text-[11px] text-brief-muted px-2 py-1"
-              >
-                <span className="text-brief-muted/50">Q{i + 1}</span>
-                <span className="text-brief-muted/60">
-                  {i === 0 && 'Who has final sign-off authority on pricing?'}
-                  {i === 1 && 'What is the revised timeline post-legal?'}
-                  {i === 2 && 'Are there competing bids we need to counter?'}
-                  {i > 2 && `Open question ${i + 1}`}
-                </span>
-              </div>
-            ))}
-          </div>
-        </div>
+        )}
 
         {/* action items */}
-        <div>
-          <div className="flex items-center gap-2 mb-3">
-            <CheckSquare className="w-3.5 h-3.5 text-brief-new" />
-            <span className="brief-section-label" style={{ color: '#10b981' }}>Action Items</span>
-          </div>
+        {actionItems.length > 0 && (
           <div>
-            {MOCK_ACTION_ITEMS.map((item) => (
-              <ActionItem key={item.id} {...item} />
-            ))}
+            <div className="flex items-center gap-2 mb-3">
+              <CheckSquare className="w-3.5 h-3.5 text-brief-new" />
+              <span className="brief-section-label" style={{ color: '#10b981' }}>Action Items</span>
+            </div>
+            <div>
+              {actionItems.map((item) => (
+                <ActionItem key={item.id} {...item} />
+              ))}
+            </div>
           </div>
-        </div>
+        )}
 
         {/* deal status */}
         <div className="bg-brief-surface border border-brief-border p-3">
@@ -168,7 +192,8 @@ export function InsightsPanel({ compartment }: { compartment: Compartment }) {
       <div className="border-t border-brief-border p-4 space-y-2 shrink-0">
         <button
           onClick={handleSaveSession}
-          className="w-full brief-btn justify-center"
+          disabled={isSaving}
+          className="w-full brief-btn justify-center disabled:opacity-50"
           style={{ borderColor: '#f59e0b', color: '#f59e0b' }}
         >
           <Save className="w-3.5 h-3.5" />
@@ -176,7 +201,8 @@ export function InsightsPanel({ compartment }: { compartment: Compartment }) {
         </button>
         <button
           onClick={handleSyncObsidian}
-          className="w-full brief-btn brief-btn-muted justify-center"
+          disabled={isSaving}
+          className="w-full brief-btn brief-btn-muted justify-center disabled:opacity-50"
         >
           <RefreshCw className="w-3.5 h-3.5" />
           Sync Obsidian

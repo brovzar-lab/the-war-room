@@ -8,7 +8,6 @@ import { useCompartmentStore } from '@/store/compartment-store';
 import { ContextSidebar } from '@/components/ContextSidebar';
 import { VoiceInterface } from '@/components/VoiceInterface';
 import { InsightsPanel } from '@/components/InsightsPanel';
-import { DemoModeBadge } from '@/components/DemoModeBadge';
 
 const STATUS_COLORS: Record<string, string> = {
   active: 'text-brief-new',
@@ -27,16 +26,35 @@ const TEMP_COLORS: Record<string, string> = {
 export default function CompartmentPage() {
   const params = useParams();
   const router = useRouter();
-  const { compartments, setActiveCompartment, activeCompartmentId } = useCompartmentStore();
+  const { compartments, fetchCompartments, setActiveCompartment, activeCompartmentId, isLoading } =
+    useCompartmentStore();
 
   const id = params.id as string;
-  const compartment = compartments.find((c) => c.id === id);
+
+  // Hydrate store if navigated here directly (e.g. deep link)
+  useEffect(() => {
+    if (compartments.length === 0 && !isLoading) {
+      fetchCompartments();
+    }
+  }, [compartments.length, isLoading, fetchCompartments]);
 
   useEffect(() => {
     if (id && id !== activeCompartmentId) {
       setActiveCompartment(id);
     }
   }, [id, activeCompartmentId, setActiveCompartment]);
+
+  const compartment = compartments.find((c) => c.id === id);
+
+  if (isLoading) {
+    return (
+      <div className="min-h-screen bg-brief-bg flex items-center justify-center">
+        <span className="font-mono text-[11px] uppercase tracking-widest text-brief-muted animate-pulse">
+          Loading…
+        </span>
+      </div>
+    );
+  }
 
   if (!compartment) {
     return (
@@ -45,10 +63,7 @@ export default function CompartmentPage() {
           <p className="text-brief-muted font-mono text-sm uppercase tracking-wider mb-4">
             Compartment not found
           </p>
-          <button
-            onClick={() => router.push('/')}
-            className="brief-btn"
-          >
+          <button onClick={() => router.push('/')} className="brief-btn">
             <ArrowLeft className="w-3 h-3" />
             Back to Brief
           </button>
@@ -59,8 +74,6 @@ export default function CompartmentPage() {
 
   return (
     <div className="flex flex-col h-screen bg-brief-bg overflow-hidden">
-      <DemoModeBadge />
-
       {/* masthead bar */}
       <header className="shrink-0 border-b border-brief-border bg-brief-bg z-40">
         <div className="h-11 px-5 flex items-center justify-between">
