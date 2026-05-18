@@ -1,10 +1,12 @@
 'use client';
 
 import { useState } from 'react';
+import { useRouter } from 'next/navigation';
 import { clsx } from 'clsx';
-import { ChevronRight, User, FileText, Tag, Network } from 'lucide-react';
+import { ChevronRight, User, FileText, Tag, Network, RefreshCw } from 'lucide-react';
 import { useCompartmentStore } from '@/store/compartment-store';
 import { Compartment } from '@/lib/mock-data';
+import { api } from '@/lib/api';
 
 interface SectionProps {
   title: string;
@@ -63,17 +65,53 @@ function ContextPageChip({ page }: { page: string }) {
 }
 
 export function ContextSidebar({ compartment }: { compartment: Compartment }) {
-  const { activeContextPages } = useCompartmentStore();
+  const { activeContextPages, fetchCompartments } = useCompartmentStore();
+  const router = useRouter();
+  const [syncing, setSyncing] = useState(false);
+  const [syncResult, setSyncResult] = useState<string | null>(null);
+
+  async function handleSyncBrain() {
+    setSyncing(true);
+    setSyncResult(null);
+    try {
+      const result = await api.seedContext(compartment.id);
+      if (result.seeded.length > 0) {
+        setSyncResult(`${result.seeded.length} page${result.seeded.length > 1 ? 's' : ''} linked`);
+        await fetchCompartments();
+        router.refresh();
+      } else {
+        setSyncResult('No matching pages found');
+      }
+    } catch {
+      setSyncResult('Sync failed — check backend');
+    } finally {
+      setSyncing(false);
+    }
+  }
 
   return (
     <div className="flex flex-col h-full bg-brief-bg">
       {/* header */}
       <div className="flex items-center justify-between px-4 py-2.5 border-b border-brief-border shrink-0">
         <span className="brief-section-label">Context Explorer</span>
-        <span className="font-mono text-[10px] text-brief-accent">
-          {activeContextPages.length} loaded
-        </span>
+        <button
+          onClick={handleSyncBrain}
+          disabled={syncing}
+          title="Search Obsidian Brain and link relevant pages"
+          className={clsx(
+            'flex items-center gap-1 font-mono text-[10px] transition-colors',
+            syncing ? 'text-brief-muted' : 'text-brief-accent hover:text-brief-text',
+          )}
+        >
+          <RefreshCw className={clsx('w-2.5 h-2.5', syncing && 'animate-spin')} />
+          {syncing ? 'Syncing…' : 'Sync Brain'}
+        </button>
       </div>
+      {syncResult && (
+        <div className="px-4 py-1.5 border-b border-brief-border bg-brief-surface">
+          <span className="font-mono text-[10px] text-brief-accent">{syncResult}</span>
+        </div>
+      )}
 
       <div className="flex-1 overflow-y-auto min-h-0 divide-y divide-brief-border/50">
         {/* context pages */}

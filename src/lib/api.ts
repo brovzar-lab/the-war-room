@@ -154,4 +154,11 @@ export const api = {
   // Writeback to vault
   writeback: (compartmentId: string) =>
     apiFetch<void>(`/api/compartments/${compartmentId}/writeback`, { method: 'POST' }),
+
+  // Seed context from Obsidian Brain vault
+  seedContext: (compartmentId: string) =>
+    apiFetch<{ seeded: string[]; compartment_id: string }>(
+      `/api/compartments/${compartmentId}/context/seed`,
+      { method: 'POST' },
+    ),
 };
