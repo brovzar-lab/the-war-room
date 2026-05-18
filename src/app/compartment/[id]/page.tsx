@@ -26,7 +26,7 @@ const TEMP_COLORS: Record<string, string> = {
 export default function CompartmentPage() {
   const params = useParams();
   const router = useRouter();
-  const { compartments, fetchCompartments, setActiveCompartment, activeCompartmentId, isLoading } =
+  const { compartments, fetchCompartments, setActiveCompartment, activeCompartmentId, isLoading, error } =
     useCompartmentStore();
 
   const id = params.id as string;
@@ -46,7 +46,12 @@ export default function CompartmentPage() {
 
   const compartment = compartments.find((c) => c.id === id);
 
-  if (isLoading) {
+  // Show spinner while loading OR before the first fetch has populated the store.
+  // Without this, `compartments = []` on initial render causes a false "not found" flash
+  // before the useEffect has a chance to call fetchCompartments().
+  const stillWaiting = !error && compartments.length === 0;
+
+  if (isLoading || stillWaiting) {
     return (
       <div className="min-h-screen bg-brief-bg flex items-center justify-center">
         <span className="font-mono text-[11px] uppercase tracking-widest text-brief-muted animate-pulse">
