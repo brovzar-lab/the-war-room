@@ -1,6 +1,7 @@
 import Link from 'next/link';
 import { api } from '@/lib/api';
 import type { Compartment } from '@/lib/mock-data';
+import { CreateCompartmentButton } from '@/components/CreateCompartmentButton';
 
 function temperatureColor(temp: string) {
   switch (temp) {
@@ -55,7 +56,7 @@ function EmptyDashboard({ dateStr }: { dateStr: string }) {
           <p className="font-sans text-sm text-brief-muted mb-8 leading-relaxed">
             Create your first deal compartment to begin intelligence tracking.
           </p>
-          <button className="brief-btn">Create Compartment</button>
+          <CreateCompartmentButton />
         </div>
       </main>
     </div>
