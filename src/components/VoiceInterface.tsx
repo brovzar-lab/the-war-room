@@ -6,6 +6,22 @@ import { PushToTalkButton } from './PushToTalkButton';
 import { api, normalizeMessage } from '@/lib/api';
 import type { Message } from '@/lib/mock-data';
 
+// Strip raw markdown symbols so responses always read as clean prose
+function stripMarkdown(text: string): string {
+  return text
+    .replace(/^#{1,6}\s+/gm, '')        // ## headings → plain text
+    .replace(/\*\*(.+?)\*\*/g, '$1')    // **bold** → plain
+    .replace(/\*(.+?)\*/g, '$1')        // *italic* → plain
+    .replace(/`{1,3}([^`]+)`{1,3}/g, '$1') // `code` → plain
+    .replace(/^[-*+]\s+/gm, '')         // - bullet → remove marker
+    .replace(/^\d+\.\s+/gm, '')         // 1. list → remove marker
+    .replace(/\[([^\]]+)\]\([^)]+\)/g, '$1') // [link](url) → text
+    .replace(/^>\s+/gm, '')             // > blockquote → remove marker
+    .replace(/_{1,2}(.+?)_{1,2}/g, '$1') // _italic_ → plain
+    .replace(/\n{3,}/g, '\n\n')         // 3+ newlines → 2
+    .trim();
+}
+
 function TimelineEntry({ message }: { message: Message }) {
   const isUser = message.role === 'user';
   const time = new Date(message.timestamp).toLocaleTimeString('en-US', {
@@ -13,6 +29,10 @@ function TimelineEntry({ message }: { message: Message }) {
     minute: '2-digit',
     hour12: false,
   });
+
+  const displayContent = isUser ? message.content : stripMarkdown(message.content);
+  // Split on double newlines to render paragraphs
+  const paragraphs = displayContent.split(/\n\n+/).filter(Boolean);
 
   return (
     <div className="flex gap-4 py-4 border-b border-brief-border/50 last:border-0">
@@ -30,7 +50,11 @@ function TimelineEntry({ message }: { message: Message }) {
         {isUser ? (
           <p className="font-sans text-sm text-brief-muted leading-relaxed">{message.content}</p>
         ) : (
-          <p className="font-serif text-base text-brief-text leading-[1.7]">{message.content}</p>
+          <div className="space-y-3">
+            {paragraphs.map((para, i) => (
+              <p key={i} className="font-serif text-base text-brief-text leading-[1.7]">{para}</p>
+            ))}
+          </div>
         )}
       </div>
     </div>
