@@ -30,7 +30,7 @@ export interface ConversationOut {
 }
 
 export interface VoiceStartOut {
-  id: string;
+  conversation_id: string;
 }
 
 export interface VoiceMessageOut {
@@ -164,4 +164,16 @@ export const api = {
       `/api/compartments/${compartmentId}/context/seed`,
       { method: 'POST' },
     ),
+
+  // Upload a document as context
+  uploadDocument: async (compartmentId: string, file: File) => {
+    const form = new FormData();
+    form.append('file', file);
+    const res = await fetch(`${API_URL}/api/compartments/${compartmentId}/upload`, {
+      method: 'POST',
+      body: form,
+    });
+    if (!res.ok) throw new Error(`Upload failed: ${res.status}`);
+    return res.json() as Promise<{ filename: string; path: string; char_count: number }>;
+  },
 };

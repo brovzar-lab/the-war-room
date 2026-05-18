@@ -1,6 +1,7 @@
 'use client';
 
 import { useCallback, useEffect, useRef, useState } from 'react';
+import { Send } from 'lucide-react';
 import { PushToTalkButton } from './PushToTalkButton';
 import { api, normalizeMessage } from '@/lib/api';
 import type { Message } from '@/lib/mock-data';
@@ -40,6 +41,8 @@ export function VoiceInterface({ compartmentId }: { compartmentId: string }) {
   const [messages, setMessages] = useState<Message[]>([]);
   const [conversationId, setConversationId] = useState<string | null>(null);
   const [isLoadingHistory, setIsLoadingHistory] = useState(true);
+  const [typedMessage, setTypedMessage] = useState('');
+  const [isSending, setIsSending] = useState(false);
   const bottomRef = useRef<HTMLDivElement>(null);
 
   // Load latest conversation history on mount / compartment change
@@ -76,6 +79,19 @@ export function VoiceInterface({ compartmentId }: { compartmentId: string }) {
     bottomRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [messages]);
 
+  const handleSendTyped = useCallback(async () => {
+    const text = typedMessage.trim();
+    if (!text || isSending) return;
+    setTypedMessage('');
+    setIsSending(true);
+    try {
+      await handleTranscript(text);
+    } finally {
+      setIsSending(false);
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [typedMessage, isSending]);
+
   const handleTranscript = useCallback(async (text: string): Promise<void> => {
     const userMsg: Message = {
       id: `local-user-${Date.now()}`,
@@ -88,7 +104,7 @@ export function VoiceInterface({ compartmentId }: { compartmentId: string }) {
     let convId = conversationId;
     if (!convId) {
       const started = await api.startConversation(compartmentId);
-      convId = started.id;
+      convId = started.conversation_id;
       setConversationId(convId);
     }
 
@@ -135,8 +151,29 @@ export function VoiceInterface({ compartmentId }: { compartmentId: string }) {
       </div>
 
       {/* PTT zone */}
-      <div className="border-t border-brief-border px-5 py-5 shrink-0 bg-brief-surface">
+      <div className="border-t border-brief-border px-5 py-4 shrink-0 bg-brief-surface space-y-3">
         <PushToTalkButton onTranscript={handleTranscript} />
+        {/* Text input alternative */}
+        <form
+          onSubmit={(e) => { e.preventDefault(); handleSendTyped(); }}
+          className="flex gap-2"
+        >
+          <input
+            type="text"
+            value={typedMessage}
+            onChange={(e) => setTypedMessage(e.target.value)}
+            placeholder="Or type a message…"
+            disabled={isSending}
+            className="flex-1 bg-brief-bg border border-brief-border text-brief-text font-mono text-[11px] px-3 py-2 outline-none focus:border-brief-accent placeholder:text-brief-muted/40 disabled:opacity-50"
+          />
+          <button
+            type="submit"
+            disabled={!typedMessage.trim() || isSending}
+            className="px-3 py-2 border border-brief-accent/40 text-brief-accent hover:bg-brief-accent/10 disabled:opacity-30 disabled:cursor-not-allowed transition-colors"
+          >
+            <Send className="w-3.5 h-3.5" />
+          </button>
+        </form>
       </div>
     </div>
   );

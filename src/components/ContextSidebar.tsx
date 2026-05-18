@@ -1,12 +1,13 @@
 'use client';
 
-import { useState } from 'react';
+import { useRef, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { clsx } from 'clsx';
-import { ChevronRight, User, FileText, Tag, Network, RefreshCw } from 'lucide-react';
+import { ChevronRight, User, FileText, Tag, Network, RefreshCw, Upload } from 'lucide-react';
 import { useCompartmentStore } from '@/store/compartment-store';
 import { Compartment } from '@/lib/mock-data';
 import { api } from '@/lib/api';
+import toast from 'react-hot-toast';
 
 interface SectionProps {
   title: string;
@@ -69,6 +70,25 @@ export function ContextSidebar({ compartment }: { compartment: Compartment }) {
   const router = useRouter();
   const [syncing, setSyncing] = useState(false);
   const [syncResult, setSyncResult] = useState<string | null>(null);
+  const [uploading, setUploading] = useState(false);
+  const fileInputRef = useRef<HTMLInputElement>(null);
+
+  async function handleUpload(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    setUploading(true);
+    try {
+      const result = await api.uploadDocument(compartment.id, file);
+      toast.success(`Uploaded: ${result.filename} (${Math.round(result.char_count / 1000)}k chars)`);
+      await fetchCompartments();
+      router.refresh();
+    } catch {
+      toast.error('Upload failed');
+    } finally {
+      setUploading(false);
+      if (fileInputRef.current) fileInputRef.current.value = '';
+    }
+  }
 
   async function handleSyncBrain() {
     setSyncing(true);
@@ -170,21 +190,30 @@ export function ContextSidebar({ compartment }: { compartment: Compartment }) {
         </Section>
       </div>
 
-      {/* context count footer */}
-      <div className="border-t border-brief-border px-4 py-2.5 shrink-0">
-        <div className="flex items-center justify-between font-mono text-[10px] text-brief-muted mb-1">
-          <span>Context loaded</span>
-          <span className="text-brief-accent">
-            {activeContextPages.length} / {compartment.contextPages.length}
-          </span>
-        </div>
-        <div className="h-0.5 bg-brief-surface2 overflow-hidden">
-          <div
-            className="h-full bg-brief-accent transition-all"
-            style={{
-              width: `${Math.round((activeContextPages.length / compartment.contextPages.length) * 100)}%`,
-            }}
+      {/* upload + context footer */}
+      <div className="border-t border-brief-border px-4 py-2.5 shrink-0 space-y-2">
+        {/* upload document button */}
+        <label className={clsx(
+          'flex items-center gap-2 w-full px-3 py-1.5 font-mono text-[10px] uppercase tracking-wider border cursor-pointer transition-colors',
+          uploading
+            ? 'border-brief-border text-brief-muted cursor-not-allowed'
+            : 'border-brief-border text-brief-muted hover:border-brief-accent hover:text-brief-accent',
+        )}>
+          <Upload className="w-3 h-3 shrink-0" />
+          {uploading ? 'Uploading…' : 'Upload Document'}
+          <input
+            ref={fileInputRef}
+            type="file"
+            accept=".pdf,.txt,.md,.doc,.docx"
+            className="hidden"
+            disabled={uploading}
+            onChange={handleUpload}
           />
+        </label>
+        {/* context count */}
+        <div className="flex items-center justify-between font-mono text-[10px] text-brief-muted">
+          <span>Context loaded</span>
+          <span className="text-brief-accent">{activeContextPages.length} active</span>
         </div>
       </div>
     </div>
