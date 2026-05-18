@@ -60,7 +60,12 @@ export function InsightsPanel({ compartment }: { compartment: Compartment }) {
   const handleSaveSession = async () => {
     setIsSaving(true);
     try {
-      await api.writeback(compartment.id);
+      const conversations = await api.getConversations(compartment.id);
+      if (conversations.length === 0) {
+        toast.error('No conversation to save — start a voice briefing first');
+        return;
+      }
+      await api.writeback(compartment.id, conversations[0].id);
       toast.success('Session saved to vault');
     } catch {
       toast.error('Failed to save session');
@@ -72,8 +77,12 @@ export function InsightsPanel({ compartment }: { compartment: Compartment }) {
   const handleSyncObsidian = async () => {
     setIsSaving(true);
     try {
-      await api.writeback(compartment.id);
-      toast.success('Synced to Obsidian vault');
+      const result = await api.seedContext(compartment.id);
+      if (result.seeded.length > 0) {
+        toast.success(`Linked ${result.seeded.length} page${result.seeded.length > 1 ? 's' : ''} from vault`);
+      } else {
+        toast.success('Vault connected — speak to load context');
+      }
     } catch {
       toast.error('Sync failed');
     } finally {
